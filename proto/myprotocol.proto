@@ -1,0 +1,421 @@
+syntax = "proto3";
+package weather_station;
+
+enum MessageType {
+  MSG_UNKNOWN                   = 0;
+
+  // System
+  MSG_READY                     = 1;
+  MSG_HEARTBEAT                 = 2;
+  MSG_STATUS                    = 3;
+  MSG_ERROR                     = 4;
+  MSG_REQUEST_RESEND            = 5;
+
+  // Handshake
+  MSG_HANDSHAKE_INIT            = 10;
+  MSG_HANDSHAKE_CHALLENGE       = 11;
+  MSG_HANDSHAKE_RESPONSE        = 12;
+  MSG_HANDSHAKE_ACK             = 13;
+  MSG_HANDSHAKE_NACK            = 14;
+
+  // Weather
+  MSG_GET_WEATHER_DATA          = 20;
+  MSG_WEATHER_DATA              = 21;
+  MSG_WEATHER_ERROR             = 22;
+  MSG_GET_WEATHER_CONDITIONS    = 23;
+  MSG_WEATHER_CONDITIONS        = 24;
+  MSG_WEATHER_CONDITIONS_ERROR  = 25;
+  MSG_SET_WEATHER_DATA          = 26;
+
+  // Ballistics
+  MSG_BALLISTICS_INPUT          = 30;
+  MSG_BALLISTICS_OUTPUT         = 31;
+
+  // Targets
+  MSG_CREATE_TARGET             = 40;
+  MSG_CREATE_TARGET_ACK         = 41;
+  MSG_CREATE_TARGET_NACK        = 42;
+  MSG_LIST_TARGETS              = 43;
+  MSG_TARGET_LIST               = 44;
+  MSG_EDIT_TARGET               = 45;
+  MSG_EDIT_TARGET_ACK           = 46;
+  MSG_EDIT_TARGET_NACK          = 47;
+  MSG_DELETE_TARGET             = 48;
+  MSG_DELETE_TARGET_ACK         = 49;
+  MSG_DELETE_TARGET_NACK        = 50;
+
+  // Profiles
+  MSG_CREATE_PROFILE            = 60;
+  MSG_CREATE_PROFILE_ACK        = 61;
+  MSG_CREATE_PROFILE_NACK       = 62;
+  MSG_LIST_PROFILES             = 63;
+  MSG_PROFILE_LIST              = 64;
+  MSG_EDIT_PROFILE              = 65;
+  MSG_EDIT_PROFILE_ACK          = 66;
+  MSG_EDIT_PROFILE_NACK         = 67;
+  MSG_DELETE_PROFILE            = 68;
+  MSG_DELETE_PROFILE_ACK        = 69;
+  MSG_DELETE_PROFILE_NACK       = 70;
+
+  // WEZ
+  MSG_GET_WEZ_DATA              = 80;
+  MSG_WEZ_DATA                  = 81;
+}
+
+// Головне повідомлення, яке передається у кожному фреймі
+message Packet {
+  Header header = 1;
+  bytes payload = 2; // Serialized submessage according to header.type
+}
+
+message Header {
+  uint32      session_id = 1;
+  uint32      seq        = 2;
+  MessageType type       = 3;
+}
+
+message Ready {
+  uint32 device_id = 1;
+  string fw_version = 2;
+  uint32 capabilities = 3; // Bitmask
+}
+
+message Heartbeat {
+  uint32 uptime = 1;
+}
+
+message Status {
+  enum StatusCode {
+    OK = 0;
+    BUSY = 1;
+    WARNING = 2;
+    ERROR = 3;
+  }
+  StatusCode code = 1;
+  uint32 uptime = 2;
+  uint32 free_storage = 3; // Blocks or KB
+}
+
+message Error {
+  enum ErrorCode {
+    UNKNOWN = 0;
+    INVALID_PAYLOAD = 1;
+    NAME_TOO_LONG = 2;
+    OUT_OF_RANGE = 3;
+    NO_AUTH = 4;
+    STORAGE_FULL = 5;
+    NOT_FOUND = 6;
+    UNSUPPORTED_VERSION = 7;
+    BUSY = 8;
+    CRC_MISMATCH = 9;
+    AUTH_FAIL = 10;
+    RATE_LIMIT = 11;
+    NOT_ALLOWED = 12;
+  }
+  ErrorCode code = 1;
+  string detail = 2;
+}
+
+message RequestResend {
+  uint32 requested_seq = 1;
+}
+
+message HandshakeInit {
+  uint32 proto_version = 1;
+  string client_id = 2;
+  uint32 client_nonce = 3;
+}
+
+message HandshakeChallenge {
+  uint32 nonce_server = 1;
+  uint32 supported_algos = 2; // Bitmask
+  bytes params = 3;
+}
+
+message HandshakeResponse {
+  string client_id = 1;
+  uint32 nonce_server = 2;
+  uint32 client_nonce = 3;
+  bytes auth = 4; // HMAC or Signature
+}
+
+message HandshakeAck {
+  uint32 session_id = 1;
+  uint32 ttl = 2;
+  uint32 permissions = 3;
+  uint32 server_time = 4;
+}
+
+message HandshakeNack {
+  enum HandshakeError {
+    UNKNOWN = 0;
+    AUTH_FAIL = 1;
+    UNSUPPORTED_VERSION = 2;
+    TOO_MANY_ATTEMPTS = 3;
+  }
+  HandshakeError error = 1;
+  uint32 retry_after = 2;
+}
+
+message GetWeatherData {
+  bool include_timestamp = 1;
+  bool fast_read = 2;
+}
+
+message WeatherData {
+  float temperature = 1;
+  float pressure = 2;
+  float humidity = 3;
+  float wind_speed = 4;
+  float wind_direction = 5;
+  
+  enum Status {
+    OK = 0;
+    SENSOR_ERROR = 1;
+    OUT_OF_RANGE = 2;
+  }
+  Status status = 6;
+  uint32 timestamp = 7;
+}
+
+message WeatherError {
+  Error.ErrorCode error_code = 1;
+  uint32 sensor_id = 2;
+}
+
+message GetWeatherConditions {}
+
+message WeatherConditions {
+  float temperature = 1;
+  float humidity = 2;
+  float humidex = 3;
+  float dew_point = 4;
+  float wind_speed = 5;
+  float pressure = 6;
+  float density = 7;
+  // ... other extended fields
+}
+
+message WeatherConditionsError {
+    string message = 1;
+}
+
+message SetWeatherData {
+  float temperature = 1;
+  float pressure = 2;
+  float humidity = 3;
+  float wind_speed = 4;
+  float wind_direction = 5;
+  bool is_manual = 6;
+}
+
+message BallisticsInput {
+  uint32 profile_id = 1; // 0 if using current/default
+  float distance = 2;
+  float target_angle = 3;
+}
+
+message BallisticsOutput {
+  uint32 timestamp_ms = 1;
+  float distance = 2;
+  float target_angle = 3;
+  float wind_speed = 4;
+  float wind_dir = 5;
+  float x_correction = 6;
+  float y_correction = 7;
+  float energy = 8;
+  float time_of_flight = 9;
+  float fgs = 10;
+  float hit_spread = 11;
+
+  enum Status {
+    OK = 0;
+    STALE_DATA = 1;
+    SENSOR_UPDATE = 2;
+    CALC_ERROR = 3;
+  }
+  Status status = 12;
+}
+
+message Target {
+  uint32 id = 1;
+  string name = 2;
+  float distance = 3;
+  float elevation_angle = 4;
+  float bearing = 5;
+  float speed = 6;
+  float size_mil = 7;
+  
+  enum Direction {
+    STATIC = 0;
+    LEFT = 1;
+    RIGHT = 2;
+  }
+  Direction direction = 8;
+}
+
+message CreateTarget {
+  uint32 group_id = 1; // 0 for new group
+  Target target = 2; // ID ignored in request
+}
+
+message CreateTargetAck {
+  uint32 target_id = 1;
+  uint32 group_id = 2;
+}
+
+message ListTargets {
+  uint32 filter_group_id = 1; // 0 for all
+}
+
+message TargetList {
+  uint32 group_id = 1;
+  string group_name = 2;
+  repeated Target targets = 3;
+}
+
+message EditTarget {
+  Target target = 1; // ID must be set. Only non-default fields updated (using field mask concept or optional fields in proto3 with 'has_')
+  // Proto3 doesn't support 'has' for primitives by default without 'optional' keyword.
+  // Alternatively, we can use a FieldMask or send the full object.
+  // For simplicity here, we assume full object update or use 'optional' keyword.
+}
+
+message EditTargetAck {
+  uint32 target_id = 1;
+}
+
+message DeleteTarget {
+  uint32 target_id = 1;
+}
+
+message DeleteTargetAck {
+  uint32 target_id = 1;
+}
+
+message DeleteTargetNack {
+  Error.ErrorCode error = 1;
+}
+
+message Profile {
+  enum DragFunction {
+    G1  = 0;
+    G7  = 1;
+  }
+  uint32 id = 1;
+  string name = 2;
+  float bullet_diameter = 3;
+  float bullet_weight = 4;
+  float bullet_length = 5;
+  float ballistic_coef = 6;
+  DragFunction drag_function = 7; // G1, G7, etc.
+  float muzzle_velocity = 8;
+  float powder_temp = 9;
+  float zero_range = 10;
+  float scope_height = 11;
+  float vertical_offset = 12;
+  float lateral_offset = 13;
+  float twist_rate = 14;
+  bool twist_left = 15;
+  // ... click units etc.
+}
+
+message CreateProfile {
+  Profile profile = 1; // ID ignored
+}
+
+message CreateProfileAck {
+  uint32 profile_id = 1;
+}
+
+message ListProfiles {}
+
+message ProfileList {
+  repeated Profile profiles = 1;
+}
+
+message EditProfile {
+  Profile profile = 1;
+}
+
+message EditProfileAck {
+  uint32 profile_id = 1;
+}
+
+message DeleteProfile {
+  uint32 profile_id = 1;
+}
+
+message DeleteProfileAck {
+  uint32 profile_id = 1;
+}
+
+message GetWezData {
+  enum AccuracyType {
+    PERCENT = 0;
+    UNIT = 1;
+  }
+  AccuracyType accuracy_type = 1;
+  float accuracy_value = 2;
+  
+  enum Preset {
+    LARGE = 0;
+    MEDIUM = 1;
+    SMALL = 2;
+    CUSTOM = 3;
+  }
+  Preset preset = 3;
+  
+  float shooter_acc = 4;
+  float dist_acc = 5;
+  float target_angle = 6;
+  float wind_speed = 7;
+  float wind_direction = 8;
+  float pressure = 9;
+  float humidity = 10;
+  float altitude = 11;
+  float ballistic_coef = 12;
+  float muzzle_velocity = 13;
+  float target_h = 14;
+  float target_w = 15;
+  
+  enum TargetType {
+    RECTANGLE = 0;
+    CIRCLE = 1;
+    TORSO = 2;
+    CUSTOM_SHAPE = 3;
+  }
+  TargetType target_type = 16;
+  
+  bool mechanical_override = 17;
+  float mechanical_precision = 18;
+  
+  enum OutputMode {
+    SPREAD = 0;
+    INFLUENCE = 1;
+  }
+  OutputMode output_mode = 19;
+}
+
+message WezData {
+  float hit_prob = 1;
+  float vert_spread = 2;
+  float hor_spread = 3;
+  float ellipse_major = 4;
+  float ellipse_minor = 5;
+  float ellipse_angle = 6;
+  float poi_shift_x = 7;
+  float poi_shift_y = 8;
+  
+  message Influence {
+    float wind = 1;
+    float range = 2;
+    float velocity = 3;
+    float precision = 4;
+    float angle = 5;
+    float atmo = 6;
+  }
+  Influence influence = 9;
+  
+  float combined_spread_radius = 10;
+}

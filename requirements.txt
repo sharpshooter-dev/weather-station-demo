@@ -1,0 +1,5 @@
+pyserial>=3.5
+cobs>=1.0.0
+protobuf>=4.0.0
+grpcio-tools>=1.50.0
+rich>=13.0.0
