@@ -77,24 +77,61 @@ pip install -r requirements.txt
 ## Usage
 
 ```bash
-python main.py <port> <command> [--baud BAUD]
+python main.py <port> <command> [options]
 ```
 
-| Command     | Description                                          |
-|-------------|------------------------------------------------------|
-| `heartbeat` | Sends a heartbeat, prints device uptime              |
-| `weather`   | Requests current weather data                        |
-| `profiles`  | Lists all stored ballistic profiles                  |
-| `targets`   | Lists all stored targets                             |
-| `listen`    | Continuously prints incoming broadcast packets       |
+### Commands
 
-**Examples:**
+| Command          | Description                                          |
+|------------------|------------------------------------------------------|
+| `heartbeat`      | Sends a heartbeat, prints device uptime              |
+| `weather`        | Requests current weather data                        |
+| `conditions`     | Requests extended weather conditions (humidex, dew point, density, …) |
+| `profiles`       | Lists all stored ballistic profiles                  |
+| `create-profile` | Creates a new ballistic profile                      |
+| `edit-profile`   | Edits an existing profile by ID                      |
+| `delete-profile` | Deletes a profile by ID                              |
+| `targets`        | Lists all stored targets                             |
+| `create-target`  | Creates a new target                                 |
+| `edit-target`    | Edits an existing target by ID                       |
+| `delete-target`  | Deletes a target by ID                               |
+| `listen`         | Continuously prints incoming broadcast packets       |
+
+### Options
+
+| Flag                | Applies to                          | Description                       |
+|---------------------|-------------------------------------|-----------------------------------|
+| `--baud BAUD`       | all                                 | Serial baud rate (default 115200) |
+| `--id ID`           | edit-*, delete-*                    | Record ID to edit or delete       |
+| `--name NAME`       | create-*, edit-*                    | Name field                        |
+| `--muzzle-velocity` | create-profile, edit-profile        | Muzzle velocity (m/s)             |
+| `--bc BC`           | create-profile, edit-profile        | Ballistic coefficient             |
+| `--drag G1\|G7`     | create-profile, edit-profile        | Drag function                     |
+| `--distance M`      | create-target, edit-target          | Distance (m)                      |
+| `--bearing DEG`     | create-target, edit-target          | Bearing (°)                       |
+| `--speed M/S`       | create-target, edit-target          | Speed (m/s)                       |
+| `--group-id ID`     | create-target                       | Group ID (default 0 = new group)  |
+
+### Examples
 
 ```bash
 # macOS / Linux
 python main.py /dev/cu.usbserial-XXX heartbeat
 python main.py /dev/cu.usbserial-XXX weather
+python main.py /dev/cu.usbserial-XXX conditions
 python main.py /dev/cu.usbserial-XXX listen
+
+# Profile CRUD
+python main.py /dev/cu.usbserial-XXX create-profile --name "M118LR" --muzzle-velocity 853 --bc 0.243 --drag G7
+python main.py /dev/cu.usbserial-XXX profiles
+python main.py /dev/cu.usbserial-XXX edit-profile   --id 1 --muzzle-velocity 860
+python main.py /dev/cu.usbserial-XXX delete-profile --id 1
+
+# Target CRUD
+python main.py /dev/cu.usbserial-XXX create-target --name "Alpha" --distance 800 --bearing 45 --speed 0
+python main.py /dev/cu.usbserial-XXX targets
+python main.py /dev/cu.usbserial-XXX edit-target   --id 2 --distance 850
+python main.py /dev/cu.usbserial-XXX delete-target --id 2
 
 # Windows
 python main.py COM3 profiles --baud 115200
@@ -121,8 +158,15 @@ python main.py COM3 profiles --baud 115200
 |--------|---------|
 | `send_heartbeat()` | `proto.Heartbeat` or `None` |
 | `get_weather_data()` | `proto.WeatherData` or `None` |
+| `get_weather_conditions()` | `proto.WeatherConditions` or `None` |
 | `list_profiles()` | `proto.ProfileList` or `None` |
+| `create_profile(profile)` | `proto.CreateProfileAck` or `None` |
+| `edit_profile(profile)` | `proto.EditProfileAck` or `None` |
+| `delete_profile(profile_id)` | `proto.DeleteProfileAck` or `None` |
 | `list_targets()` | `proto.TargetList` or `None` |
+| `create_target(target, group_id)` | `proto.CreateTargetAck` or `None` |
+| `edit_target(target)` | `proto.EditTargetAck` or `None` |
+| `delete_target(target_id)` | `proto.DeleteTargetAck` or `None` |
 | `listen()` | Generator yielding `proto.Packet` indefinitely |
 
 Each request-response method:
